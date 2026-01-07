@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AuraStream Pro - Spotify Clone</title>
+    <style>
+        :root { --sp-green: #1db954; --bg-black: #000; --card-bg: #181818; }
+        body { background: var(--bg-black); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 260px; background: #000; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .nav-group { background: #121212; border-radius: 8px; padding: 15px; }
+        .nav-item { padding: 12px; color: #b3b3b3; cursor: pointer; font-weight: bold; transition: 0.3s; display: flex; align-items: center; gap: 10px; }
+        .nav-item:hover { color: white; }
+        .library-list { flex: 1; overflow-y: auto; margin-top: 10px; }
+        .lib-item { font-size: 0.9rem; padding: 8px; color: #b3b3b3; cursor: pointer; border-radius: 4px; }
+        .lib-item:hover { background: #282828; color: white; }
+
+        /* MAIN CONTENT */
+        .main { flex: 1; background: linear-gradient(to bottom, #222, #121212); border-radius: 8px; margin: 10px 10px 100px 0; padding: 20px; overflow-y: auto; position: relative; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .search-input { background: #242424; border: none; padding: 10px 20px; border-radius: 20px; color: white; width: 300px; }
+        .btn-green { background: var(--sp-green); color: black; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        .btn-outline { background: transparent; border: 1px solid #888; color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; margin-left: 10px; }
+
+        /* GRID NHẠC */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
+        .card { background: var(--card-bg); padding: 15px; border-radius: 8px; transition: 0.3s; cursor: pointer; position: relative; }
+        .card:hover { background: #282828; }
+        .card img { width: 100%; aspect-ratio: 1/1; border-radius: 4px; margin-bottom: 10px; }
+        .btn-save { position: absolute; right: 10px; bottom: 50px; background: var(--sp-green); color: black; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; display: none; }
+        .card:hover .btn-save { display: block; }
+
+        /* MODAL ĐĂNG NHẬP */
+        #login-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .login-box { background: #282828; padding: 40px; border-radius: 10px; width: 300px; text-align: center; }
+        .login-box input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 4px; border: none; }
+
+        /* PLAYER BAR */
+        .player-bar { position: fixed; bottom: 0; width: 100%; height: 90px; background: #000; border-top: 1px solid #282828; display: flex; align-items: center; padding: 0 20px; z-index: 999; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="nav-group">
+            <div class="nav-item" id="txt-home">🏠 Home</div>
+            <div class="nav-item" id="txt-search-nav">🔍 Search</div>
+        </div>
+        <div class="nav-group" style="flex:1">
+            <div class="nav-item" id="txt-lib">📚 Your Library</div>
+            <div class="library-list" id="my-library">
+                </div>
+        </div>
+        <button class="btn-outline" onclick="toggleLang()" id="btn-lang">Tiếng Việt</button>
+    </div>
+
+    <div class="main">
+        <div class="top-bar">
+            <input type="text" id="inp-search" class="search-input" placeholder="What do you want to play?">
+            <div>
+                <button class="btn-outline" onclick="showLogin()" id="txt-login-btn">Log in</button>
+                <button class="btn-green" id="txt-signup">Sign up</button>
+            </div>
+        </div>
+
+        <h2 id="txt-recommend">Recommended for you</h2>
+        <div class="grid" id="music-grid"></div>
+    </div>
+
+    <div id="login-modal">
+        <div class="login-box">
+            <h2 id="txt-login-title">Log in to AuraStream</h2>
+            <input type="text" placeholder="Username">
+            <input type="password" placeholder="Password">
+            <button class="btn-green" style="width:100%" onclick="hideLogin()">Log in</button>
+            <p style="font-size: 0.8rem; margin-top:10px; cursor:pointer" onclick="hideLogin()">Cancel</p>
+        </div>
+    </div>
+
+    <div class="player-bar">
+        <div id="player-info" style="width:30%; display:flex; align-items:center; gap:10px;">
+            <img id="cur-img" src="" style="width:50px; border-radius:4px; display:none">
+            <div id="cur-name" style="font-weight:bold"></div>
+        </div>
+        <audio id="audio" controls style="width:40%; filter:invert(1)"></audio>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let savedSongs = JSON.parse(localStorage.getItem('myLib')) || [];
+
+        const translations = {
+            en: {
+                home: "🏠 Home", search: "🔍 Search", lib: "📚 Your Library",
+                login: "Log in", signup: "Sign up", recommend: "Recommended for you",
+                searchPlaceholder: "What do you want to play?", loginTitle: "Log in to AuraStream",
+                langBtn: "Tiếng Việt"
+            },
+            vi: {
+                home: "🏠 Trang chủ", search: "🔍 Tìm kiếm", lib: "📚 Thư viện của bạn",
+                login: "Đăng nhập", signup: "Đăng ký", recommend: "Gợi ý cho bạn",
+                searchPlaceholder: "Bạn muốn phát nội dung gì?", loginTitle: "Đăng nhập AuraStream",
+                langBtn: "English"
+            }
+        };
+
+        function toggleLang() {
+            currentLang = currentLang === 'en' ? 'vi' : 'en';
+            const t = translations[currentLang];
+            document.getElementById('txt-home').innerText = t.home;
+            document.getElementById('txt-search-nav').innerText = t.search;
+            document.getElementById('txt-lib').innerText = t.lib;
+            document.getElementById('txt-login-btn').innerText = t.login;
+            document.getElementById('txt-signup').innerText = t.signup;
+            document.getElementById('txt-recommend').innerText = t.recommend;
+            document.getElementById('inp-search').placeholder = t.searchPlaceholder;
+            document.getElementById('txt-login-title').innerText = t.loginTitle;
+            document.getElementById('btn-lang').innerText = t.langBtn;
+        }
+
+        // Tìm kiếm và hiển thị
+        async function search(q) {
+            const res = await fetch(`https://itunes.apple.com/search?term=${q}&limit=12&media=music`);
+            const data = await res.json();
+            const grid = document.getElementById('music-grid');
+            grid.innerHTML = "";
+            data.results.forEach(song => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <img src="${song.artworkUrl100.replace('100x100','400x400')}">
+                    <div style="font-weight:bold">${song.trackName}</div>
+                    <div style="color:#b3b3b3; font-size:0.8rem">${song.artistName}</div>
+                    <button class="btn-save" onclick="saveToLib(event, '${song.trackName}', '${song.previewUrl}')">❤</button>
+                `;
+                card.onclick = () => play(song);
+                grid.appendChild(card);
+            });
+        }
+
+        function play(song) {
+            const a = document.getElementById('audio');
+            a.src = song.previewUrl;
+            document.getElementById('cur-img').src = song.artworkUrl100;
+            document.getElementById('cur-img').style.display = 'block';
+            document.getElementById('cur-name').innerText = song.trackName;
+            a.play();
+        }
+
+        // Lưu vào Thư viện
+        function saveToLib(e, name, url) {
+            e.stopPropagation(); // Không cho kích hoạt phát nhạc khi bấm nút Tim
+            if(!savedSongs.some(s => s.name === name)) {
+                savedSongs.push({name, url});
+                localStorage.setItem('myLib', JSON.stringify(savedSongs));
+                updateLibUI();
+                alert("Saved to Library!");
+            }
+        }
+
+        function updateLibUI() {
+            const libList = document.getElementById('my-library');
+            libList.innerHTML = savedSongs.map(s => `<div class="lib-item" onclick="playSaved('${s.url}', '${s.name}')">🎵 ${s.name}</div>`).join('');
+        }
+
+        function playSaved(url, name) {
+            const a = document.getElementById('audio');
+            a.src = url;
+            document.getElementById('cur-name').innerText = name;
+            document.getElementById('cur-img').style.display = 'none';
+            a.play();
+        }
+
+        function showLogin() { document.getElementById('login-modal').style.display = 'flex'; }
+        function hideLogin() { document.getElementById('login-modal').style.display = 'none'; }
+
+        document.getElementById('inp-search').onkeypress = (e) => { if(e.key === 'Enter') search(e.target.value); };
+        
+        // Khởi tạo
+        updateLibUI();
+        search('Global Top Hits');
+    </script>
+</body>
+</html>
